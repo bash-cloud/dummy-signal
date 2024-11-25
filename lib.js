@@ -2,6 +2,7 @@
 
 const crypto = require('node:crypto')
 const { subtle } = require('node:crypto').webcrypto
+const { CryptoKey } = require('node:crypto').webcrypto
 
 /// ////////////////////////////////////////////////////////////////////////////////
 // Cryptographic Primitives
@@ -25,56 +26,55 @@ function bufferToString (arr) {
   return Buffer.from(arr).toString()
 }
 
-function genRandomSalt(len = 16) {
-  return crypto.getRandomValues(new Uint8Array(len));
+function genRandomSalt (len = 16) {
+  return crypto.getRandomValues(new Uint8Array(len))
 }
 
-
-async function cryptoKeyToJSON(cryptoKey) {
-  const keyJWK = await crypto.subtle.exportKey('jwk', cryptoKey);
+async function cryptoKeyToJSON (cryptoKey) {
+  const keyJWK = await crypto.subtle.exportKey('jwk', cryptoKey)
 
   // Dynamically set key_ops based on key type and usage
   if (!keyJWK.key_ops || keyJWK.key_ops.length === 0) {
-    keyJWK.key_ops = cryptoKey.usages.length > 0 ? cryptoKey.usages : ['deriveKey'];
+    keyJWK.key_ops = cryptoKey.usages.length > 0 ? cryptoKey.usages : ['deriveKey']
   }
 
-  console.log('[cryptoKeyToJSON] Exported Public Key JSON:', keyJWK);
-  return keyJWK;
+  console.log('[cryptoKeyToJSON] Exported Public Key JSON:', keyJWK)
+  return keyJWK
 }
 
-async function generateEG() {
+async function generateEG () {
   const keypair = await crypto.subtle.generateKey(
     { name: 'ECDH', namedCurve: 'P-384' },
     true, // Extractable (can be exported)
     ['deriveKey'] // Key usage for private key
-  );
+  )
 
-  const keypairObject = { pub: keypair.publicKey, sec: keypair.privateKey };
+  const keypairObject = { pub: keypair.publicKey, sec: keypair.privateKey }
 
   // Validate keys
   if (!(keypairObject.pub instanceof CryptoKey)) {
-    console.error('[generateEG] Generated public key is not a valid CryptoKey:', keypairObject.pub);
-    throw new Error('Generated public key is not a valid CryptoKey!');
+    console.error('[generateEG] Generated public key is not a valid CryptoKey:', keypairObject.pub)
+    throw new Error('Generated public key is not a valid CryptoKey!')
   }
 
   if (!(keypairObject.sec instanceof CryptoKey)) {
-    console.error('[generateEG] Generated private key is not a valid CryptoKey:', keypairObject.sec);
-    throw new Error('Generated private key is not a valid CryptoKey!');
+    console.error('[generateEG] Generated private key is not a valid CryptoKey:', keypairObject.sec)
+    throw new Error('Generated private key is not a valid CryptoKey!')
   }
 
-  console.log('Generated Key Pair:', keypairObject);
-  return keypairObject;
+  console.log('Generated Key Pair:', keypairObject)
+  return keypairObject
 }
-async function computeDH(myPrivateKey, theirPublicKey) {
+async function computeDH (myPrivateKey, theirPublicKey) {
   if (!(myPrivateKey instanceof CryptoKey)) {
-    throw new TypeError('[computeDH] Invalid private key: must be a CryptoKey.');
+    throw new TypeError('[computeDH] Invalid private key: must be a CryptoKey.')
   }
 
   if (!(theirPublicKey instanceof CryptoKey)) {
-    throw new TypeError('[computeDH] Invalid public key: must be a CryptoKey.');
+    throw new TypeError('[computeDH] Invalid public key: must be a CryptoKey.')
   }
 
-  console.log('[computeDH] Computing shared secret...');
+  console.log('[computeDH] Computing shared secret...')
 
   try {
     const derivedKey = await subtle.deriveKey(
@@ -83,13 +83,13 @@ async function computeDH(myPrivateKey, theirPublicKey) {
       { name: 'HMAC', hash: 'SHA-256', length: 256 },
       true,
       ['sign', 'verify']
-    );
+    )
 
-    console.log('[computeDH] Shared secret derived successfully.');
-    return derivedKey;
+    console.log('[computeDH] Shared secret derived successfully.')
+    return derivedKey
   } catch (err) {
-    console.error('[computeDH] Failed to compute shared secret:', err.message);
-    throw new Error(`computeDH failed: ${err.message}`);
+    console.error('[computeDH] Failed to compute shared secret:', err.message)
+    throw new Error(`computeDH failed: ${err.message}`)
   }
 }
 
@@ -124,18 +124,18 @@ async function HMACtoAESKey (key, data, exportToArrayBuffer = false) {
   return out
 }
 
-async function HMACtoHMACKey(key, data) {
+async function HMACtoHMACKey (key, data) {
   // Input validation
   if (!(key instanceof CryptoKey)) {
-    throw new TypeError('Invalid key: key must be a valid CryptoKey.');
+    throw new TypeError('Invalid key: key must be a valid CryptoKey.')
   }
   if (typeof data !== 'string' || data.trim() === '') {
-    throw new TypeError('Invalid data: data must be a non-empty string.');
+    throw new TypeError('Invalid data: data must be a non-empty string.')
   }
 
   try {
     // Perform HMAC signing to derive an intermediate buffer
-    const hmacBuf = await subtle.sign({ name: 'HMAC' }, key, Buffer.from(data));
+    const hmacBuf = await subtle.sign({ name: 'HMAC' }, key, Buffer.from(data))
 
     // Import the buffer as a new HMAC key
     const derivedKey = await subtle.importKey(
@@ -144,99 +144,99 @@ async function HMACtoHMACKey(key, data) {
       { name: 'HMAC', hash: 'SHA-256', length: 256 },
       true,
       ['sign']
-    );
+    )
 
-    return derivedKey;
+    return derivedKey
   } catch (err) {
     // Ensure any cryptographic errors are wrapped with context
-    throw new Error(`HMACtoHMACKey failed: ${err.message}`);
+    throw new Error(`HMACtoHMACKey failed: ${err.message}`)
   }
 }
-async function HKDF(inputKey, salt, infoStr) {
+async function HKDF (inputKey, salt, infoStr) {
   if (!(inputKey instanceof CryptoKey)) {
-    throw new TypeError('[HKDF] Invalid inputKey: must be a CryptoKey.');
+    throw new TypeError('[HKDF] Invalid inputKey: must be a CryptoKey.')
   }
 
   if (!(salt instanceof CryptoKey)) {
-    throw new TypeError('[HKDF] Invalid salt: must be a CryptoKey.');
+    throw new TypeError('[HKDF] Invalid salt: must be a CryptoKey.')
   }
 
-  console.log('[HKDF] Starting HKDF...');
+  console.log('[HKDF] Starting HKDF...')
 
-  const inputKeyRaw = await subtle.exportKey('raw', inputKey);
-  const inputKeyHKDF = await subtle.importKey('raw', inputKeyRaw, 'HKDF', false, ['deriveKey']);
+  const inputKeyRaw = await subtle.exportKey('raw', inputKey)
+  const inputKeyHKDF = await subtle.importKey('raw', inputKeyRaw, 'HKDF', false, ['deriveKey'])
 
-  console.log('[HKDF] inputKey successfully converted.');
+  console.log('[HKDF] inputKey successfully converted.')
 
   const hkdfOut1 = await subtle.deriveKey(
     {
       name: 'HKDF',
       hash: 'SHA-256',
       salt: Buffer.from('salt1'),
-      info: Buffer.from(infoStr),
+      info: Buffer.from(infoStr)
     },
     inputKeyHKDF,
     { name: 'HMAC', hash: 'SHA-256', length: 256 },
     true,
     ['sign']
-  );
+  )
 
   const hkdfOut2 = await subtle.deriveKey(
     {
       name: 'HKDF',
       hash: 'SHA-256',
       salt: Buffer.from('salt2'),
-      info: Buffer.from(infoStr),
+      info: Buffer.from(infoStr)
     },
     inputKeyHKDF,
     { name: 'HMAC', hash: 'SHA-256', length: 256 },
     true,
     ['sign']
-  );
+  )
 
-  console.log('[HKDF] HKDF outputs derived successfully.');
-  return [hkdfOut1, hkdfOut2];
+  console.log('[HKDF] HKDF outputs derived successfully.')
+  return [hkdfOut1, hkdfOut2]
 }
-async function encryptWithGCM(key, plaintext, iv, authenticatedData = '') {
-  if (!(key instanceof CryptoKey)) throw new Error('[encryptWithGCM] Invalid key: must be a CryptoKey.');
-  if (!(iv instanceof Uint8Array)) throw new Error('[encryptWithGCM] Invalid IV: must be a Uint8Array.');
+async function encryptWithGCM (key, plaintext, iv, authenticatedData = '') {
+  if (!(key instanceof CryptoKey)) throw new Error('[encryptWithGCM] Invalid key: must be a CryptoKey.')
+  if (!(iv instanceof Uint8Array)) throw new Error('[encryptWithGCM] Invalid IV: must be a Uint8Array.')
 
-  const plaintextBuffer = Buffer.from(plaintext, 'utf-8');
-  const additionalDataBuffer = Buffer.from(authenticatedData);
+  const plaintextBuffer = Buffer.from(plaintext, 'utf-8')
+  const additionalDataBuffer = Buffer.from(authenticatedData)
 
   try {
     const ciphertext = await crypto.subtle.encrypt(
       { name: 'AES-GCM', iv, additionalData: additionalDataBuffer },
       key,
       plaintextBuffer
-    );
+    )
 
-    console.log('[encryptWithGCM] Encryption successful.');
-    return ciphertext;
+    console.log('[encryptWithGCM] Encryption successful.')
+    return ciphertext
   } catch (err) {
-    console.error('[encryptWithGCM] Encryption failed:', err.message);
-    throw new Error(`encryptWithGCM failed: ${err.message}`);
+    console.error('[encryptWithGCM] Encryption failed:', err.message)
+    throw new Error(`encryptWithGCM failed: ${err.message}`)
   }
 }
-async function decryptWithGCM(key, ciphertext, iv, authenticatedData = '') {
-  if (!(key instanceof CryptoKey)) throw new TypeError('[decryptWithGCM] Invalid key: must be a CryptoKey.');
-  if (!(iv instanceof Uint8Array)) throw new TypeError('[decryptWithGCM] Invalid IV: must be a Uint8Array.');
+async function decryptWithGCM (key, ciphertext, iv, authenticatedData = '') {
+  if (!(key instanceof CryptoKey)) throw new TypeError('[decryptWithGCM] Invalid key: must be a CryptoKey.')
+  if (!(iv instanceof Uint8Array)) throw new TypeError('[decryptWithGCM] Invalid IV: must be a Uint8Array.')
 
   // Convert ciphertext to ArrayBuffer if it's not already
-  const ciphertextBuffer = ciphertext instanceof ArrayBuffer ? ciphertext : Buffer.from(ciphertext);
+  const ciphertextBuffer = ciphertext instanceof ArrayBuffer ? ciphertext : Buffer.from(ciphertext)
 
   try {
     const plaintext = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv, additionalData: Buffer.from(authenticatedData) },
       key,
       ciphertextBuffer
-    );
+    )
 
-    console.log('[decryptWithGCM] Decryption successful.');
-    return Buffer.from(plaintext).toString('utf-8'); // Convert to string
+    console.log('[decryptWithGCM] Decryption successful.')
+    return Buffer.from(plaintext).toString('utf-8') // Convert to string
   } catch (err) {
-    console.error('[decryptWithGCM] Decryption failed:', err.message);
-    throw new Error(`decryptWithGCM failed: ${err.message}`);
+    console.error('[decryptWithGCM] Decryption failed:', err.message)
+    throw new Error(`decryptWithGCM failed: ${err.message}`)
   }
 }
 
