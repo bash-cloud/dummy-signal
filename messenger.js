@@ -15,7 +15,7 @@ const {
   cryptoKeyToJSON, // async
   govEncryptionDataStr
 } = require('./lib')
-const { subtle, CryptoKey } = require('node:crypto').webcrypto
+
 const crypto = require('node:crypto')
 
 
